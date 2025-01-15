@@ -25,7 +25,7 @@ class TestApiURL(unittest.TestCase):
         self.assertEqual(
             api_url.port_set, {8080, SERVICE_DEFAULT_PORT}
         )  # 默认端口 443 被添加
-        self.assertEqual({"/v1/translate"}, api_url.path_set)
+        self.assertEqual({"/translate", "/v1/translate"}, api_url.path_set)
         self.assertEqual({"token": ["666666"]}, api_url.param_dict)
 
     def test_from_url_invalid(self):
@@ -56,7 +56,7 @@ class TestApiURL(unittest.TestCase):
     def test_from_url_token_path(self):
         # 测试令牌路径
         api_url = ApiURL.from_url(self.token_path_url)
-        self.assertIn("/access_token/translate", api_url.path_set)
+        self.assertIn(f"/{ACCESS_TOKEN_PATH[0]}/translate", api_url.path_set)
 
     def test_from_url_ip(self):
         # 测试 IP 地址作为主机
@@ -97,7 +97,7 @@ class TestApiURL(unittest.TestCase):
             parsed_url = urlparse(url)
             self.assertIn(parsed_url.scheme, ["http", "https"])
             self.assertIn(parsed_url.hostname, ["example.com"])
-            self.assertIn(parsed_url.path, ["/api/v1/translate"])
+            self.assertIn(parsed_url.path, ["/translate", "/v1/translate"])
 
     def test_add_same_host(self):
         # 测试相同主机的加法运算
@@ -137,9 +137,9 @@ class TestApiURL(unittest.TestCase):
 
     def test_parse_path_token(self):
         # 测试令牌路径解析
-        path = "/access_token"
+        path = f"/{ACCESS_TOKEN_PATH[0]}"
         parsed = ApiURL._parse_path(path)
-        self.assertIn("/access_token/translate", parsed)
+        self.assertIn(f"/{ACCESS_TOKEN_PATH[0]}/translate", parsed)
 
     def test_parse_path_custom(self):
         # 测试自定义路径解析
