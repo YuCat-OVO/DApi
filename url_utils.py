@@ -95,7 +95,6 @@ def fetch_and_normalize_url_list(
     process_url_list = raw_url_list.copy()
     # 创建线程池执行多线程任务
     with ThreadPoolExecutor(max_workers=SSL_CERT_CHECK_MAX_WORKERS) as executor:
-        future_to_url: dict = {}
 
         # 筛选 IP URL
         ip_url_list = [ip_url for ip_url in process_url_list if not ip_url.has_domain]
@@ -107,11 +106,16 @@ def fetch_and_normalize_url_list(
             else None
         )
 
-        # 提交任务
-        for url in ip_url_list:
-            for port in url.port_set:
-                future = executor.submit(get_domains_from_cert, url.host, port)
-                future_to_url[future] = url
+        # 提前过滤掉端口为80的URL
+        filtered_urls = {
+            (url, port) for url in ip_url_list for port in url.port_set if port != 80
+        }
+
+        # 使用列表推导式提交任务
+        future_to_url = {
+            executor.submit(get_domains_from_cert, url.host, port): url
+            for url, port in filtered_urls
+        }
 
         # 收集解析结果
         to_add = []

@@ -2,8 +2,6 @@ import unittest
 
 from main import CategorizedResults
 
-import unittest
-
 
 class TestCategorizedResults(unittest.TestCase):
     def setUp(self):

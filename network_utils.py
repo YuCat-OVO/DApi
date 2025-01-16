@@ -12,71 +12,6 @@ import requests
 from config import REPLY_RULE, MAX_ALLOWED_LATENCY_SECONDS, TEST_DATA, REQUEST_HEADERS
 
 
-@dataclass
-class ProcessedResponse:
-    """处理后的响应数据类。
-
-    用于封装 HTTP 响应或业务处理的结果数据。
-
-    :param status: HTTP状态码或业务状态
-    :param data: 响应数据内容
-    :param latency: 处理延迟时间(秒)
-    :param timestamp: 响应处理时间戳
-    """
-
-    status: Union[str, int] = field(default="")
-    data: Any = field(default=None)
-    latency: float = field(default=0.0)
-    timestamp: datetime = field(default_factory=datetime.now)
-
-    def __post_init__(self) -> None:
-        """数据类初始化后的处理。
-
-        - 确保 status 为字符串类型
-        - 验证 latency 为非负数
-
-        :raises ValueError: 如果 latency 为负数
-        """
-        # 转换状态码为字符串
-        if isinstance(self.status, (int, Enum)):
-            self.status = str(self.status)
-
-        # 验证延迟时间
-        if self.latency < 0:
-            raise ValueError("Latency must be non-negative")
-
-    def to_dict(self) -> dict[str, Any]:
-        """将响应数据转换为字典格式。
-
-        :returns: 包含响应数据的字典
-        """
-        return {
-            "status": self.status,
-            "data": self.data,
-            "latency": self.latency,
-            "timestamp": self.timestamp.isoformat(),
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ProcessedResponse":
-        """从字典创建响应对象。
-
-        :param data: 包含响应数据的字典
-        :returns: 新响应对象实例
-        """
-        timestamp = (
-            datetime.fromisoformat(data["timestamp"])
-            if "timestamp" in data
-            else datetime.now()
-        )
-        return cls(
-            status=data.get("status", ""),
-            data=data.get("data"),
-            latency=float(data.get("latency", 0.0)),
-            timestamp=timestamp,
-        )
-
-
 class ReturnStatus(Enum):
     """业务逻辑状态枚举类。
 
@@ -116,6 +51,64 @@ class ReturnStatus(Enum):
             return cls[status_str.upper()]
         except KeyError:
             return Type[cls.ERROR]
+
+
+@dataclass
+class ProcessedResponse:
+    """处理后的响应数据类。
+
+    用于封装 HTTP 响应或业务处理的结果数据。
+
+    :param status: HTTP状态码或业务状态
+    :param data: 响应数据内容
+    :param latency: 处理延迟时间(秒)
+    :param timestamp: 响应处理时间戳
+    """
+
+    status: Union[ReturnStatus, str, int]
+    data: Any = field(default=None)
+    latency: float = field(default=0.0)
+    timestamp: datetime = field(default_factory=datetime.now)
+
+    def __post_init__(self) -> None:
+        """数据类初始化后的处理。
+
+        - 确保 status 为字符串类型
+        """
+        # 转换状态码为字符串
+        if isinstance(self.status, (int, Enum)):
+            self.status = str(self.status)
+
+    def to_dict(self) -> dict[str, Any]:
+        """将响应数据转换为字典格式。
+
+        :returns: 包含响应数据的字典
+        """
+        return {
+            "status": self.status,
+            "data": self.data,
+            "latency": self.latency,
+            "timestamp": self.timestamp.isoformat(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ProcessedResponse":
+        """从字典创建响应对象。
+
+        :param data: 包含响应数据的字典
+        :returns: 新响应对象实例
+        """
+        timestamp = (
+            datetime.fromisoformat(data["timestamp"])
+            if "timestamp" in data
+            else datetime.now()
+        )
+        return cls(
+            status=data.get("status", ""),
+            data=data.get("data"),
+            latency=float(data.get("latency", 0.0)),
+            timestamp=timestamp,
+        )
 
 
 def parse_response_data(response: requests.Response) -> Optional[str]:
@@ -182,14 +175,14 @@ def process_successful_response(
         if check_cloudflare_block(response.text):
             logging.error(f"Failed to get response from {url} because of Cloudflare.")
             return ProcessedResponse(
-                status=ReturnStatus.CONTENT_IS_CLOUDFLARE.name,
+                status=ReturnStatus.CONTENT_IS_CLOUDFLARE,
                 data="Cloudflare block",
                 latency=latency,
             )
         else:
             logging.error(f"Failed to parse JSON response from {url}.")
         return ProcessedResponse(
-            status=ReturnStatus.UNEXPECTED_CONTENT.name,
+            status=ReturnStatus.UNEXPECTED_CONTENT,
             data="Failed to parse JSON",
             latency=latency,
         )
@@ -197,12 +190,12 @@ def process_successful_response(
     if validate_response_content(response_data, rules):
         logging.info(f"Successful response from {url}. Latency: {latency:.2f}s")
         return ProcessedResponse(
-            status=ReturnStatus.SUCCESS.name, data=response_data, latency=latency
+            status=ReturnStatus.SUCCESS, data=response_data, latency=latency
         )
     else:
         logging.debug(f"Invalid response content from {url}: {response_data[15:]}")
         return ProcessedResponse(
-            status=ReturnStatus.INVALID_CONTENT.name,
+            status=ReturnStatus.INVALID_CONTENT,
             data=response_data,
             latency=latency,
         )
@@ -221,7 +214,7 @@ def handle_error_response(
     if 500 <= status_code < 600:
         logging.warning(f"Server error ({status_code}) at {url}.")
         return ProcessedResponse(
-            status=ReturnStatus.SERVER_ERROR_50X.name,
+            status=ReturnStatus.SERVER_ERROR_50X,
             data=f"HTTP error {status_code} at {url}",
             latency=latency,
         )
@@ -242,7 +235,7 @@ def handle_error_response(
     else:
         logging.warning(f"Unhandled HTTP status code ({status_code}) at {url}.")
         return ProcessedResponse(
-            status=ReturnStatus.ERROR.name,
+            status=ReturnStatus.ERROR,
             data=f"Unhandled HTTP status code {status_code} at {url}.",
             latency=latency,
         )
@@ -290,14 +283,14 @@ def make_request(
     except requests.exceptions.Timeout:
         logging.debug(f"Timeout accessing {url}.")
         return ProcessedResponse(
-            status=ReturnStatus.TIME_OUT.name,
+            status=ReturnStatus.TIME_OUT,
             data=f"Timeout accessing {url}.",
             latency=-1,
         )
     except requests.exceptions.RequestException as e:
         logging.debug(f"Request to {url} failed: {e}")
         return ProcessedResponse(
-            status=ReturnStatus.REQUEST_FAIL.name,
+            status=ReturnStatus.REQUEST_FAIL,
             data=f"Request to {url} failed.",
             latency=-1,
         )

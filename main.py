@@ -1,7 +1,8 @@
 import logging
+from collections.abc import Mapping, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field, fields
-from typing import Union, Dict, List, Type
+from typing import Union
 
 import urllib3
 from tqdm import tqdm
@@ -13,9 +14,10 @@ from config import (
     TEST_DATA,
     REPLY_RULE,
     SAVE_PROCESSED_DATA,
+    SORT_PROCESSED_DATA,
 )
 from logging_utils import setup_logger
-from network_utils import check_endpoint, ProcessedResponse, ReturnStatus
+from network_utils import check_endpoint, ProcessedResponse
 from url_utils import generate_urls
 
 setup_logger()
@@ -39,14 +41,14 @@ class CategorizedResults:
     :param failed_urls: 检查失败的 URL 列表。
     """
 
-    available_https_endpoints: Dict[str, float] = field(default_factory=dict)
-    available_http_endpoints: Dict[str, float] = field(default_factory=dict)
-    rate_limited: Dict[str, float] = field(default_factory=dict)
-    cloudflare_blocked: Dict[str, float] = field(default_factory=dict)
-    service_unavailable: Dict[str, float] = field(default_factory=dict)
-    unauthorized_urls: Dict[str, float] = field(default_factory=dict)
-    timeout_or_unreachable: List[str] = field(default_factory=list)
-    failed_urls: List[str] = field(default_factory=list)
+    available_https_endpoints: dict[str, float] = field(default_factory=dict)
+    available_http_endpoints: dict[str, float] = field(default_factory=dict)
+    rate_limited: dict[str, float] = field(default_factory=dict)
+    cloudflare_blocked: dict[str, float] = field(default_factory=dict)
+    service_unavailable: dict[str, float] = field(default_factory=dict)
+    unauthorized_urls: dict[str, float] = field(default_factory=dict)
+    timeout_or_unreachable: list[str] = field(default_factory=list)
+    failed_urls: list[str] = field(default_factory=list)
 
     def add_result(self, url: str, response: ProcessedResponse) -> None:
         """根据响应结果将 URL 分类到相应的类别中。
@@ -55,34 +57,40 @@ class CategorizedResults:
         :param response: 处理后的响应对象。
         """
         match response.status:
-            case ReturnStatus.SUCCESS:
+            case "SUCCESS":
                 if url.startswith("https://"):
                     self.available_https_endpoints[url] = response.latency
                 else:
                     self.available_http_endpoints[url] = response.latency
             case "429":
                 self.rate_limited[url] = response.latency
-            case ReturnStatus.CONTENT_IS_CLOUDFLARE:
+            case "CONTENT_IS_CLOUDFLARE":
                 self.cloudflare_blocked[url] = response.latency
-            case ReturnStatus.SERVER_ERROR_50X:
+            case "SERVER_ERROR_50X":
                 self.service_unavailable[url] = response.latency
             case "401":
                 self.unauthorized_urls[url] = response.latency
-            case ReturnStatus.TIME_OUT:
+            case "TIME_OUT":
                 self.timeout_or_unreachable.append(url)
-            case ReturnStatus.REQUEST_FAIL:
+            case "REQUEST_FAIL":
                 self.failed_urls.append(url)
-            case ReturnStatus.ERROR:
+            case "ERROR":
                 self.failed_urls.append(url)
             case _:
+                logging.warning(f"Unhandled status: {response.status} for URL: {url}")
                 self.failed_urls.append(url)
 
-    def to_dict(self) -> Dict[str, Union[Dict[str, float], List[str]]]:
+    def to_dict(self) -> dict[str, Union[dict[str, float], list[str]]]:
         """将分类结果转换为字典格式。
 
         :returns: 包含所有分类结果的字典。
         """
-        return {field.name: getattr(self, field.name) for field in fields(self)}
+        result_dict = {}
+        for field_ in fields(self):
+            field_name = field_.name
+            field_value = getattr(self, field_name)
+            result_dict[field_name] = field_value
+        return result_dict
 
     def sort(self, field_name: str, reverse: bool = False) -> None:
         """对指定字段进行排序。
@@ -113,7 +121,7 @@ class CategorizedResults:
 
 def process_urls_with_thread_pool(
     urls: list[str],
-    categorized_results: Type[CategorizedResults],
+    categorized_results: CategorizedResults,
     max_workers: int = URL_PROCESSING_MAX_PROCESSES,
     show_progress: bool = SHOW_SSL_PROGRESS_BAR,
 ) -> None:
@@ -147,32 +155,44 @@ def process_urls_with_thread_pool(
             progress_bar.close()
 
 
-def display_results(categorized_results, show_list=False, sort_results=True):
+def display_results(categorized_results, show_list=False):
     """
     显示分类结果。
 
     :param categorized_results: 包含所有分类结果的对象。
     :param show_list: 是否输出纯净的 URL 列表（无延迟和 Emoji）。
-    :param sort_results: 是否按延迟排序，默认按延迟排序（仅对 "available_endpoints" 的数据生效）。
     """
 
-    def print_urls(title, url_dict, emoji):
+    def print_urls(
+        title: str,
+        url_dict_or_list: Union[dict[str, float], list[str]],
+        emoji: str,
+    ) -> None:
         """打印分类 URL 列表（支持排序和延迟显示）。
 
         :param title: 分类标题。
-        :param url_dict: 包含 URL 和延迟的字典。
+        :param url_dict_or_list: 包含 URL 和延迟的字典 或者 URL 列表。
         :param emoji: 分类的 Emoji 图标。
+        :raises TypeError: 如果 url_dict_or_list 不是字典或列表。
         """
+        if not isinstance(url_dict_or_list, (Mapping, Iterable)):
+            logging.error("url_dict_or_list 必须是字典或列表")
+            raise TypeError("url_dict_or_list 必须是字典或列表")
+
         print(f"\n{emoji} {title}:")
-        urls = list(url_dict.keys())
-        if sort_results:
-            urls = sorted(urls, key=lambda this_url: url_dict[this_url])
-        for url in urls:
-            latency = url_dict[url]
-            latency_display = (
-                "Timeout" if latency == float("inf") else f"{latency:.2f} ms"
-            )
-            print(f"{emoji} {url} (Latency: {latency_display})")
+
+        # 处理字典或列表
+        if isinstance(url_dict_or_list, Mapping):
+            urls = list(url_dict_or_list.keys())
+            for url in urls:
+                latency = url_dict_or_list[url]
+                latency_display = (
+                    "Timeout" if latency == float("inf") else f"{latency:.2f} ms"
+                )
+                print(f"{emoji} {url} (Latency: {latency_display})")
+        else:
+            for url in url_dict_or_list:
+                print(f"{emoji} {url}")
 
     # 使用更符合场景的 Emoji
     print_urls(
@@ -247,8 +267,15 @@ def main():
         logging.error(f"Error during URL checking: {e}")
         return
 
+    if SORT_PROCESSED_DATA:
+        for field_name in fields(categorized_results):
+            try:
+                categorized_results.sort(str(field_name))
+            except ValueError as e:
+                logging.error(f"Failed to sort '{field_name}': {e}")
+
     # 打印分类结果
-    display_results(categorized_results)
+    display_results(categorized_results, True)
 
     # 如果启用了保存功能，将分类结果保存到文件
     if SAVE_PROCESSED_DATA:
