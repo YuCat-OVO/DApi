@@ -2,7 +2,7 @@ name: Run Python Script and Release
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   workflow_dispatch:
 
 jobs:
