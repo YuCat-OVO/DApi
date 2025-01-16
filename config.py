@@ -43,7 +43,7 @@ def validate_rules(rules: dict) -> dict:
 # Logging Configuration
 # ------------------------------
 # 日志级别，支持 DEBUG, INFO, WARNING, ERROR, CRITICAL
-LOG_LEVEL = "DEBUG"
+LOG_LEVEL = "INFO"
 
 # 日志格式，包含时间、日志名称、日志级别和消息
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -67,7 +67,7 @@ SSL_MAX_ALLOWED_LATENCY_SECONDS = 60
 # URL Processing Configuration
 # ------------------------------
 # URL 处理的最大并发进程数，用于控制并发处理的进程数量
-URL_PROCESSING_MAX_PROCESSES = 64
+URL_PROCESSING_MAX_PROCESSES = 128
 
 # URL 请求的最大允许延迟时间（秒），超过此时间将被视为超时
 MAX_ALLOWED_LATENCY_SECONDS = 60
