@@ -1,9 +1,11 @@
 import logging
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum, auto
 from math import ceil
-from typing import Union
+from typing import Any, Optional, Union, Type
 
 import requests
 
@@ -12,9 +14,152 @@ from config import REPLY_RULE, MAX_ALLOWED_LATENCY_SECONDS, TEST_DATA, REQUEST_H
 
 @dataclass
 class ProcessedResponse:
-    status: str
-    data: str
-    latency: float
+    """处理后的响应数据类。
+
+    用于封装 HTTP 响应或业务处理的结果数据。
+
+    :param status: HTTP状态码或业务状态
+    :param data: 响应数据内容
+    :param latency: 处理延迟时间(秒)
+    :param timestamp: 响应处理时间戳
+    """
+
+    status: Union[str, int] = field(default="")
+    data: Any = field(default=None)
+    latency: float = field(default=0.0)
+    timestamp: datetime = field(default_factory=datetime.now)
+
+    def __post_init__(self) -> None:
+        """数据类初始化后的处理。
+
+        - 确保 status 为字符串类型
+        - 验证 latency 为非负数
+
+        :raises ValueError: 如果 latency 为负数
+        """
+        # 转换状态码为字符串
+        if isinstance(self.status, (int, Enum)):
+            self.status = str(self.status)
+
+        # 验证延迟时间
+        if self.latency < 0:
+            raise ValueError("Latency must be non-negative")
+
+    def to_dict(self) -> dict[str, Any]:
+        """将响应数据转换为字典格式。
+
+        :returns: 包含响应数据的字典
+        """
+        return {
+            "status": self.status,
+            "data": self.data,
+            "latency": self.latency,
+            "timestamp": self.timestamp.isoformat(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ProcessedResponse":
+        """从字典创建响应对象。
+
+        :param data: 包含响应数据的字典
+        :returns: 新响应对象实例
+        """
+        timestamp = (
+            datetime.fromisoformat(data["timestamp"])
+            if "timestamp" in data
+            else datetime.now()
+        )
+        return cls(
+            status=data.get("status", ""),
+            data=data.get("data"),
+            latency=float(data.get("latency", 0.0)),
+            timestamp=timestamp,
+        )
+
+
+class ReturnStatus(Enum):
+    """业务逻辑状态枚举类。
+
+    定义了不同的响应内容类型和处理状态。
+
+    :cvar SUCCESS: 处理成功。
+    :cvar CONTENT_IS_CLOUDFLARE: 响应内容为 Cloudflare 页面。
+    :cvar UNEXPECTED_CONTENT: 其他类型的响应内容。
+    :cvar INVALID_CONTENT: JSON 响应但包含未预期内容。
+    :cvar SERVER_ERROR_50X: 50x 服务器错误。
+    :cvar TIME_OUT: 请求超时。
+    :cvar REQUEST_FAIL: 请求失败。
+    :cvar ERROR: 处理错误。
+    """
+
+    SUCCESS = auto()  # 处理成功
+    CONTENT_IS_CLOUDFLARE = auto()  # 响应内容为 Cloudflare 页面
+    UNEXPECTED_CONTENT = auto()  # 其他类型的响应内容
+    INVALID_CONTENT = auto()  # JSON响应但包含未预期内容
+    SERVER_ERROR_50X = auto()  # 50x 服务器错误
+    TIME_OUT = auto()  # 请求超时
+    REQUEST_FAIL = auto()  # 请求失败
+    ERROR = auto()  # 处理错误
+
+    def __str__(self) -> str:
+        """返回枚举值的字符串表示。"""
+        return self.name
+
+    @classmethod
+    def from_string(cls, status_str: str) -> Type["ReturnStatus"]:
+        """从字符串获取对应的状态枚举值。
+
+        :param status_str: 状态字符串
+        :returns: 对应的状态枚举值，如果不存在返回 None
+        """
+        try:
+            return cls[status_str.upper()]
+        except KeyError:
+            return Type[cls.ERROR]
+
+
+def parse_response_data(response: requests.Response) -> Optional[str]:
+    """解析响应对象中的 JSON 数据并提取 "data" 字段。
+
+    :param response: 包含 JSON 数据的响应对象。
+    :return: 如果解析成功，返回 "data" 字段的值；否则返回 None。
+    """
+    try:
+        return response.json().get("data", "")
+    except (ValueError, AttributeError):
+        return None
+
+
+def check_cloudflare_block(response_text: str) -> bool:
+    """检查响应文本是否包含 Cloudflare 拦截信息。
+
+    :param response_text: 响应文本内容。
+    :return: 如果包含 Cloudflare 拦截信息，返回 True；否则返回 False。
+    """
+    return any(
+        cf_word in response_text for cf_word in ["Attention Required!", "Cloudflare"]
+    )
+
+
+def validate_response_content(
+    response_data: str, rules: dict[str, Union[list[str], str]]
+) -> bool:
+    """验证响应内容是否符合预设规则。
+
+    :param response_data: 需要验证的响应数据。
+    :param rules: 包含验证规则的字典，如 "include_words" 和 "fail_regex"。
+    :return: 如果响应内容符合规则，返回 True；否则返回 False。
+    """
+    include_words = rules.get("include_words", [])
+    fail_regex = rules.get("fail_regex", "")
+
+    if not all(word in response_data for word in include_words):
+        return False
+
+    if re.search(fail_regex, response_data):
+        return False
+
+    return True
 
 
 def process_successful_response(
@@ -22,122 +167,110 @@ def process_successful_response(
     response: requests.Response,
     latency: float,
     rules: dict[str, Union[list[str], str]],
-) -> dict[str, Union[str, float]]:
-    """
-    处理 HTTP 请求的成功响应，验证响应内容是否符合预设规则。
+) -> ProcessedResponse:
+    """处理 HTTP 请求的成功响应，验证响应内容是否符合预设规则。
 
-    参数:
-        url (str): 请求的目标 URL。
-        response (requests.Response): 成功的响应对象。
-        latency (float): 请求的延迟时间，以秒为单位。
-        rules (dict[str, Union[list[str], str]]): 包含检查响应内容的规则的字典。
-
-    返回:
-        dict[str, Union[str, float]]: 包含状态、数据和延迟的字典。
+    :param url: 请求的目标 URL。
+    :param response: 成功响应对象。
+    :param latency: 请求的延迟时间，以秒为单位。
+    :param rules: 包含检查响应内容的规则的字典。
+    :return: 包含状态、数据和延迟的 `ProcessedResponse` 对象。
     """
-    try:
-        response_data = response.json().get("data", "")
-    except (ValueError, AttributeError):
-        if any(
-            cf_word in response.text
-            for cf_word in ["Attention Required!", "Cloudflare"]
-        ):
+    response_data = parse_response_data(response)
+
+    if response_data is None:
+        if check_cloudflare_block(response.text):
             logging.error(f"Failed to get response from {url} because of Cloudflare.")
+            return ProcessedResponse(
+                status=ReturnStatus.CONTENT_IS_CLOUDFLARE.name,
+                data="Cloudflare block",
+                latency=latency,
+            )
         else:
             logging.error(f"Failed to parse JSON response from {url}.")
-        return {"status": "error", "data": "Failed to parse JSON", "latency": latency}
+        return ProcessedResponse(
+            status=ReturnStatus.UNEXPECTED_CONTENT.name,
+            data="Failed to parse JSON",
+            latency=latency,
+        )
 
-    if all(word in response_data for word in rules.get("include_words", [])):
-        if re.search(rules.get("fail_regex", ""), response_data):
-            logging.debug(f"Invalid response content from {url}: {response_data}")
-            return {
-                "status": "invalid_content",
-                "data": response_data,
-                "latency": latency,
-            }
-
+    if validate_response_content(response_data, rules):
         logging.info(f"Successful response from {url}. Latency: {latency:.2f}s")
-        return {
-            "status": "success",
-            "data": response_data,
-            "latency": latency,
-        }
-
-    logging.debug(f"Unexpected response content from {url}: {response_data}")
-    return {"status": "unexpected_content", "data": response_data, "latency": latency}
+        return ProcessedResponse(
+            status=ReturnStatus.SUCCESS.name, data=response_data, latency=latency
+        )
+    else:
+        logging.debug(f"Invalid response content from {url}: {response_data[15:]}")
+        return ProcessedResponse(
+            status=ReturnStatus.INVALID_CONTENT.name,
+            data=response_data,
+            latency=latency,
+        )
 
 
 def handle_error_response(
     url: str, status_code: int, latency: float
-) -> dict[str, Union[str, float]]:
-    """
-    处理非 200 的 HTTP 响应状态码。
+) -> ProcessedResponse:
+    """处理非 200 的 HTTP 响应状态码。
 
-    参数:
-        url (str): 请求的目标 URL。
-        status_code (int): HTTP 响应状态码。
-        latency (float): 请求的延迟时间。
-
-    返回:
-        dict[str, Union[str, float]]: 包含状态、数据和延迟的字典。
+    :param url: 请求的目标 URL。
+    :param status_code: HTTP 响应状态码。
+    :param latency: 请求的延迟时间，以秒为单位。
+    :return: 包含状态、数据和延迟的 `ProcessedResponse` 对象。
     """
     if 500 <= status_code < 600:
         logging.warning(f"Server error ({status_code}) at {url}.")
-        return {
-            "status": "50x",
-            "data": f"HTTP error {status_code} at {url}",
-            "latency": latency,
-        }
-    if status_code == 429:
+        return ProcessedResponse(
+            status=ReturnStatus.SERVER_ERROR_50X.name,
+            data=f"HTTP error {status_code} at {url}",
+            latency=latency,
+        )
+    elif status_code == 429:
         logging.warning(f"Rate limit exceeded (429) at {url}.")
-        return {
-            "status": "429",
-            "data": f"Rate limit exceeded (429) at {url}.",
-            "latency": latency,
-        }
-    if status_code == 401:
+        return ProcessedResponse(
+            status=status_code,
+            data=f"Rate limit exceeded (429) at {url}.",
+            latency=latency,
+        )
+    elif status_code == 401:
         logging.warning(f"Unauthorized (401) at {url}.")
-        return {
-            "status": "401",
-            "data": f"Unauthorized (401) at {url}.",
-            "latency": latency,
-        }
-
-    logging.warning(f"Unhandled HTTP status code ({status_code}) at {url}.")
-    return {
-        "status": str(status_code),
-        "data": f"Unhandled HTTP status code {status_code} at {url}.",
-        "latency": latency,
-    }
+        return ProcessedResponse(
+            status=status_code,
+            data=f"Unauthorized (401) at {url}.",
+            latency=latency,
+        )
+    else:
+        logging.warning(f"Unhandled HTTP status code ({status_code}) at {url}.")
+        return ProcessedResponse(
+            status=ReturnStatus.ERROR.name,
+            data=f"Unhandled HTTP status code {status_code} at {url}.",
+            latency=latency,
+        )
 
 
 def make_request(
     url: str, test_data: dict, rules: dict[str, Union[list[str], str]], verify: bool
-) -> dict[str, Union[str, float]]:
-    """
-    发起 HTTP POST 请求，并根据响应状态码和延迟返回结果。
+) -> ProcessedResponse:
+    """发起 HTTP POST 请求，并根据响应状态码和延迟返回结果。
 
-    参数:
-        url (str): 请求的目标 URL。
-        test_data (dict): 包含请求数据的字典。
-        rules (dict[str, list[str]]): 应用于响应的规则。
-        verify (bool): 指定是否验证 HTTPS 证书。
-
-    返回:
-        dict[str, Union[str, float]]: 如果请求成功，返回包含 URL、延迟信息的字典；
-        如果遇到错误（如超时、服务器错误等），则返回错误代码的字符串。
+    :param url: 请求的目标 URL。
+    :param test_data: 包含请求数据的字典。
+    :param rules: 应用于响应的规则。
+    :param verify: 指定是否验证 HTTPS 证书。
+    :return: 如果请求成功，返回包含 URL、延迟信息的字典；如果遇到错误（如超时、服务器错误等），则返回错误代码的字符串。
+    :raises TypeError: 如果输入参数类型不正确。
+    :raises ValueError: 如果输入参数值无效。
     """
     try:
         start_time = time.time()
+        timeout = MAX_ALLOWED_LATENCY_SECONDS + max(
+            1, ceil(MAX_ALLOWED_LATENCY_SECONDS / 3)
+        )
         response = requests.post(
             url,
             json=test_data,
             headers=REQUEST_HEADERS,
-            timeout=(
-                MAX_ALLOWED_LATENCY_SECONDS + 1
-                if ceil(MAX_ALLOWED_LATENCY_SECONDS / 3) <= 0
-                else MAX_ALLOWED_LATENCY_SECONDS + ceil(MAX_ALLOWED_LATENCY_SECONDS / 3)
-            ),
+            timeout=timeout,
             verify=verify,
         )
         latency = time.time() - start_time
@@ -156,107 +289,37 @@ def make_request(
 
     except requests.exceptions.Timeout:
         logging.debug(f"Timeout accessing {url}.")
-        return {
-            "status": "timeout",
-            "data": f"Timeout accessing {url}.",
-            "latency": -1,
-        }
-    except requests.exceptions.RequestException:
-        logging.debug(f"Request to {url} failed.")
-        return {
-            "status": "failed",
-            "data": f"Request to {url} failed.",
-            "latency": -1,
-        }
-
-
-def generate_urls(url: str) -> tuple[str, str]:
-    """
-    根据输入的 URL 生成相应的 HTTP 和 HTTPS URL，并适当调整端口号。
-
-    参数:
-        url (str): 输入的 URL。
-
-    返回:
-        tuple[str, str]: 包含 HTTP 和 HTTPS URL 的元组。
-
-    抛出:
-        ValueError: 如果输入的 URL 格式不正确。
-
-    注意:
-        本函数假设输入的 URL 格式正确，并以 "http://" 或 "https://" 开头。
-        函数会检查并替换标准端口号：80 (HTTP) 和 443 (HTTPS)。
-    """
-    if not url.startswith(("http://", "https://")):
-        logging.error(f"Invalid URL format: {url}")
-        raise ValueError(f"Invalid URL: {url}")
-
-    # 根据协议生成对应的 URL
-    http_url = (
-        url.replace("https://", "http://", 1) if url.startswith("https://") else url
-    )
-    https_url = (
-        url.replace("http://", "https://", 1) if url.startswith("http://") else url
-    )
-
-    # 替换标准端口号
-    http_url = http_url.replace(":443/", ":80/", 1) if ":443/" in http_url else http_url
-    https_url = (
-        https_url.replace(":80/", ":443/", 1) if ":80/" in https_url else https_url
-    )
-
-    return http_url, https_url
+        return ProcessedResponse(
+            status=ReturnStatus.TIME_OUT.name,
+            data=f"Timeout accessing {url}.",
+            latency=-1,
+        )
+    except requests.exceptions.RequestException as e:
+        logging.debug(f"Request to {url} failed: {e}")
+        return ProcessedResponse(
+            status=ReturnStatus.REQUEST_FAIL.name,
+            data=f"Request to {url} failed.",
+            latency=-1,
+        )
 
 
 def check_endpoint(
     url: str,
     test_data: dict = TEST_DATA,
     rules: dict[str, Union[list[str], str]] = REPLY_RULE,
-) -> dict[str, tuple[str, dict[str, Union[str, float]]]]:
+) -> tuple[str, ProcessedResponse]:
+    """检查给定的 URL 是否可用，支持 HTTP 和 HTTPS 协议。
+
+    :param url: 要检查的基础 URL
+    :param test_data: 请求中发送的数据，默认使用 TEST_DATA
+    :param rules: 响应的验证规则，默认使用 REPLY_RULE
+
+    :raises RequestException: 当请求发生网络错误时
+    :raises ValueError: 当响应不符合预期规则时
     """
-    检查给定的 URL 是否可用，支持 HTTP 和 HTTPS 协议。
-
-    参数:
-        url (str): 要检查的基础 URL。
-        test_data (dict): 请求中发送的数据。
-        rules (dict[str, Union[list[str], str]]): 响应的验证规则。
-
-    返回:
-        tuple[str, dict[str, Union[str, float]]]: 包含成功的 URL 和其延迟信息的字典；
-        如果失败，返回失败信息。
-    """
-    http_url, https_url = generate_urls(url)
-
-    url_response = {
-        "http": (
-            url,
-            {
-                "status": "failed",
-                "data": f"Request to {url} failed: No valid response from HTTP",
-                "latency": -1,
-            },
-        ),
-        "https": (
-            url,
-            {
-                "status": "failed",
-                "data": f"Request to {url} failed: No valid response from HTTPS",
-                "latency": -1,
-            },
-        ),
-    }
-
-    # 检查 HTTP URL
-    http_response = make_request(http_url, test_data, rules, verify=False)
-    if http_response["status"]:
-        url_response["http"] = (http_url, http_response)
-
-    # 检查 HTTPS URL
-    https_response = make_request(https_url, test_data, rules, verify=True)
-    if https_response["status"]:
-        url_response["https"] = (https_url, https_response)
-
-    return url_response
+    verify = url.startswith("https://")
+    url_response = make_request(url, test_data, rules, verify=verify)
+    return url, url_response
 
 
 if __name__ == "__main__":
