@@ -23,6 +23,7 @@ def deduplicate_urls(url_list: list[ApiURL]) -> list[ApiURL]:
     :param url_list: 包含 ApiURL 实例的列表
     :return: 去重并合并后的 ApiURL 实例列表
     """
+
     # 创建字典，键是 host，值是对应的 ApiURL 实例列表
     host_to_urls = {}
     for url in url_list:
@@ -43,14 +44,10 @@ def deduplicate_urls(url_list: list[ApiURL]) -> list[ApiURL]:
 
 
 def load_urls_from_file(file_priority: Optional[list[str]] = None) -> list[ApiURL]:
-    """
-    自动加载文件中的 URL，优先按照文件列表顺序读取，标准化 URL 并去重后返回。
+    """自动加载文件中的 URL，优先按照文件列表顺序读取，标准化 URL 并去重后返回。
 
-    Args:
-        file_priority (Optional[list[str]]): 指定文件优先级列表，默认为配置中的 FILE_PRIORITY。
-
-    Returns:
-        list[str]: 包含有效且标准化的 URL 列表。
+    :param file_priority: 指定文件优先级列表，默认为配置中的 FILE_PRIORITY。
+    :return: 包含有效且标准化的 URL 列表。
     """
     # 动态处理默认值
     if file_priority is None:
@@ -89,15 +86,11 @@ def load_urls_from_file(file_priority: Optional[list[str]] = None) -> list[ApiUR
 def fetch_and_normalize_url_list(
     raw_url_list: list[ApiURL], show_progress: bool = True
 ) -> list[ApiURL] | None:
-    """
-    生成一个 URL 列表，所有 URL 统一存储，并对 IP 类型的 URL 进行证书获取域名处理。
+    """生成一个 URL 列表，所有 URL 统一存储，并对 IP 类型的 URL 进行证书获取域名处理。
 
-    Args:
-        raw_url_list (list[str]): 原始 URL 列表。
-        show_progress (bool): 是否显示进度条，默认开启。
-
-    Returns:
-        list[ApiURL]: 包含所有处理后的 URL 的列表，IP URL 会保留，同时添加解析出的域名 URL。
+    :param raw_url_list: 原始 URL 列表。
+    :param show_progress: 是否显示进度条，默认开启。
+    :return: 包含所有处理后的 URL 的列表，IP URL 会保留，同时添加解析出的域名 URL。
     """
     process_url_list = raw_url_list.copy()
     # 创建线程池执行多线程任务
@@ -158,16 +151,17 @@ def generate_urls(
     show_progress: bool = SHOW_SSL_PROGRESS_BAR,
     process_certificate: bool = PROCESS_CERTIFICATE,
 ) -> list[str]:
-    """
-    入口函数：生成检测证书后的 URL 列表，并调用 add_api_path 拼接 API 路径。
+    """生成处理后的 URL 列表，并根据配置决定是否进行证书检测和域名替换。
 
-    Args:
-        input_file (list[str]): 输入文件路径，包含原始 URL 列表。
-        show_progress (bool): 是否显示进度条，默认从配置中读取。
-        process_certificate (bool): 是否检测证书，默认从配置中读取。
+    该函数从指定的输入文件中加载原始 URL 列表，并根据配置决定是否对 IP 类型的 URL 进行证书检测和域名替换。
+    处理后的 URL 列表会进一步调用 `generate_url_list` 方法生成最终的 URL 列表，并确保去重。
 
-    Returns:
-        list[str]: 包含处理后的 URL 列表。
+    :param input_file: 输入文件路径列表，包含原始 URL 列表。默认从 `FILE_PRIORITY` 配置中读取。
+    :param show_progress: 是否显示进度条。默认从 `SHOW_SSL_PROGRESS_BAR` 配置中读取。
+    :param process_certificate: 是否对 IP 类型的 URL 进行证书检测和域名替换。默认从 `PROCESS_CERTIFICATE` 配置中读取。
+    :return: 包含处理后的 URL 列表，已去重。
+    :raises FileNotFoundError: 如果输入文件不存在或无法读取。
+    :raises ValueError: 如果输入文件内容格式不正确。
     """
     # 加载 URL 列表
     raw_urls = load_urls_from_file(input_file)

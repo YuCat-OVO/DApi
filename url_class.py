@@ -9,18 +9,18 @@ from config import DEFAULT_API_BASE_PATH, ACCESS_TOKEN_PATH, SERVICE_DEFAULT_POR
 
 @dataclass
 class ApiURL:
-    """API URL 数据类,用于处理、验证和生成 API URL。
+    """API URL 数据类，用于处理、验证和生成 API URL。
 
-    该类将输入的 URL 字符串解析为结构化的组件,并确保其有效性。
+    该类将输入的 URL 字符串解析为结构化的组件，并确保其有效性。
     支持 URL 规范化、主机验证、路径解析和查询参数处理。
-    当两个 ApiURL 实例的主机相同时,可以通过加法运算符合并它们的端口、路径和查询参数。
+    当两个 ApiURL 实例的主机相同时，可以通过加法运算符合并它们的端口、路径和查询参数。
 
-    :param host: 主机名(域名或IP地址)
-    :param has_domain: 是否包含域名,默认为 False
-    :param scheme: URL 协议,默认为 "https"
+    :param host: 主机名（域名或 IP 地址）
+    :param has_domain: 是否包含域名，默认为 False
+    :param scheme: URL 协议，默认为 "https"
     :param port_set: 端口号集合
     :param path_set: URL 路径段集合
-    :param param_dict: URL 查询参数字典,每个参数可以有多个值
+    :param param_dict: URL 查询参数字典，每个参数可以有多个值
     :raises ValueError: 当 URL 格式无效或组件验证失败时
     """
 
@@ -148,7 +148,7 @@ class ApiURL:
         """验证 IP 地址有效性。
 
         :param ip: 要验证的 IP 地址
-        :return: 布尔值,表示 IP 地址是否有效
+        :return: 布尔值，表示 IP 地址是否有效
         :raises ValueError: 当 IP 地址无效时
         """
         if not validators.ipv4(ip) and not validators.ipv6(ip):
@@ -160,7 +160,7 @@ class ApiURL:
         """验证域名有效性。
 
         :param domain: 要验证的域名
-        :return: 布尔值,表示域名是否有效
+        :return: 布尔值，表示域名是否有效
         :raises ValueError: 当域名无效时
         """
         if not validators.domain(domain):
@@ -224,7 +224,7 @@ class ApiURL:
         :return: 合并后的新 ApiURL 实例
         :raises ValueError: 当两个实例的域名不同时
 
-        当两个实例的域名相同时,合并它们的端口、路径和查询参数。
+        当两个实例的域名相同时，合并它们的端口、路径和查询参数。
         """
         if not isinstance(other, ApiURL):
             return NotImplemented
@@ -276,6 +276,3 @@ class ApiURL:
 
 if __name__ == "__main__":
     pass
-    url1 = ApiURL.from_url("https://api.example.com:7777/translate?lang=en")
-    print(url1)
-    print(url1.generate_url_list())

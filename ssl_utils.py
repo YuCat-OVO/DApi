@@ -13,14 +13,10 @@ from config import SSL_MAX_ALLOWED_LATENCY_SECONDS
 
 
 def validate_and_normalize_domain(domain: str) -> Optional[str]:
-    """
-    验证域名是否合法，并对通配符域名进行规范化。
+    """验证域名是否合法，并对通配符域名进行规范化。
 
-    Args:
-        domain (str): 待验证的域名。
-
-    Returns:
-        Optional[str]: 合法域名或 None。
+    :param domain: 待验证的域名。
+    :return: 合法域名或 None。
     """
     domain = domain.strip().lower()
     if domain.startswith("*."):
@@ -31,16 +27,12 @@ def validate_and_normalize_domain(domain: str) -> Optional[str]:
 def try_connection(
     ip: str, port: int, ssl_sock_timeout: int = SSL_MAX_ALLOWED_LATENCY_SECONDS
 ) -> Optional[bytes]:
-    """
-    使用默认的 SSL 上下文连接服务器并获取证书。
+    """使用默认的 SSL 上下文连接服务器并获取证书。
 
-    Args:
-        ip (str): 目标 IP 地址或域名。
-        port (int): 目标端口。
-        ssl_sock_timeout (int): SSL 连接超时时间。
-
-    Returns:
-        Optional[bytes]: 服务器的证书字节数据，如果连接失败返回 None。
+    :param ip: 目标 IP 地址或域名。
+    :param port: 目标端口。
+    :param ssl_sock_timeout: SSL 连接超时时间。
+    :return: 服务器的证书字节数据，如果连接失败返回 None。
     """
     context = ssl.create_default_context()
     context.check_hostname = False
@@ -64,14 +56,10 @@ def try_connection(
 
 
 def extract_domains_from_cert(cert: Certificate) -> list[str]:
-    """
-    从证书中提取域名，包括 CN 和 SAN。
+    """从证书中提取域名，包括 CN 和 SAN。
 
-    Args:
-        cert (Certificate): 解析后的证书对象。
-
-    Returns:
-        list[str]: 提取到的合法域名。
+    :param cert: 解析后的证书对象。
+    :return: 提取到的合法域名。
     """
     domains = set()
 
@@ -106,15 +94,11 @@ def extract_domains_from_cert(cert: Certificate) -> list[str]:
 
 
 def get_domains_from_cert(ip: str, port: int) -> list[str]:
-    """
-    尝试连接目标服务器并提取 SSL 证书中的域名。
+    """尝试连接目标服务器并提取 SSL 证书中的域名。
 
-    Args:
-        ip (str): 目标 IP 地址或域名。
-        port (int): 目标端口。
-
-    Returns:
-        list[str]: 从证书中提取的合法域名列表。
+    :param ip: 目标 IP 地址或域名。
+    :param port: 目标端口。
+    :return: 从证书中提取的合法域名列表。
     """
     try:
         cert_bin = try_connection(ip, port)

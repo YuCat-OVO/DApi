@@ -4,8 +4,7 @@ from config import LOG_LEVEL, LOG_FORMAT, ENABLE_LOG_FILE_OUTPUT
 
 
 def setup_logger():
-    """
-    配置日志记录器，支持文件日志和控制台日志。
+    """配置日志记录器，支持文件日志和控制台日志。
 
     日志级别、格式和是否启用文件日志根据配置动态调整。
     """

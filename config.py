@@ -7,17 +7,11 @@ load_dotenv()
 
 
 def validate_rules(rules: dict) -> dict:
-    """
-    验证规则字典的正确性，确保 include_words 是列表，fail_regex 是字符串。
+    """验证规则字典的正确性，确保 include_words 是列表，fail_regex 是字符串。
 
-    参数:
-        rules (dict): 待验证的规则字典。
-
-    返回:
-        dict: 验证通过的规则字典。如果验证失败，使用默认值代替。
-
-    异常:
-        ValueError: 如果规则的类型不符合要求，抛出错误。
+    :param rules: 待验证的规则字典。
+    :return: 验证通过的规则字典。如果验证失败，使用默认值代替。
+    :raises ValueError: 如果规则的类型不符合要求，抛出错误。
     """
     # 验证 include_words
     include_words = rules.get("include_words", [])
