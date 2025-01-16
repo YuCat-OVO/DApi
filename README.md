@@ -1,4 +1,4 @@
-# Deepl API 扫描器
+# DAPI 扫描器
 
 ## 概述
 
@@ -14,7 +14,7 @@
 
 ### Checklist
 
-- [ ] `/v1` 端点检测
+- [x] `/v1` 端点检测
 - [ ] 常用下一级域名检测，比如 d/deepl/deeplx/translate.example.com
 - [ ] 扫描器 API（Fofa、Shodan）接入
 - [ ] 常用列表下载
@@ -23,22 +23,14 @@
 - [ ] QPS 测试
 - [ ] 自动重试机制
 - [ ] 守护进程支持
-- [ ] 优化记录 URL 的数据结构
+- [x] 优化记录 URL 的数据结构
 - [ ] 提升排序算法性能
-- [ ] 部分 API token 的接入
-- [ ] 非标准端点测试
+- [x] 部分 API token 的接入
+- [x] 非标准端点测试
 - [ ] 网页查询?
 
 ## 快速开始
-
-1. 安装依赖：
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. 使用 IP 列表运行程序：
-   ```bash
-   python scanner.py --input ips.txt
-   ```
+我什么也不知道
 
 ## Thanks
 - https://deeplx.smnet.io/urls
