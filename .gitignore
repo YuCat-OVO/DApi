@@ -1,5 +1,5 @@
 # Test files
-*url*.txt
+#*url*.txt
 
 # result
 *result*.json
