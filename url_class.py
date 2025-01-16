@@ -1,6 +1,5 @@
 import re
 from dataclasses import dataclass, field
-from typing import ClassVar
 from urllib.parse import urlparse, parse_qs, urlunparse, urlencode
 
 import validators
@@ -31,9 +30,6 @@ class ApiURL:
     port_set: set[int] = field(default_factory=set)
     path_set: set[str] = field(default_factory=set)
     param_dict: dict[str, list[str]] = field(default_factory=dict)
-
-    # 类常量
-    _PORT_RANGE: ClassVar[tuple[int, int]] = (1, 65535)
 
     @classmethod
     def from_url(cls, url: str) -> "ApiURL":
@@ -125,10 +121,10 @@ class ApiURL:
         :return: 标准化后的 URL 字符串
         :raises ValueError: 当提供空 URL 时
         """
+        url = url.strip()
         if not url:
             raise ValueError("Empty URL provided")
 
-        url = url.strip()
         url = re.sub(r"/+$", "", url)
 
         if url.startswith("http://"):
@@ -258,10 +254,22 @@ class ApiURL:
             param_dict=new_query,
         )
 
+    def __eq__(self, other: "ApiURL") -> bool:
+        """比较两个 ApiURL 实例是否相等。
+
+        只比较 host 属性，与 __hash__ 保持一致。
+
+        :param other: 要比较的另一个 ApiURL 实例
+        :return: 如果两个实例的 host 相等，则返回 True，否则返回 False
+        """
+        if not isinstance(other, ApiURL):
+            return NotImplemented
+        return self.host == other.host
+
     def __hash__(self) -> int:
         """计算实例的哈希值。
 
-        :return: 哈希值
+        :return: 基于 host 属性的哈希值
         """
         return hash(self.host)
 

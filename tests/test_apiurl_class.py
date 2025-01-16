@@ -123,6 +123,13 @@ class TestApiURL(unittest.TestCase):
         url2 = ApiURL.from_url("https://example.com/api/v2")
         self.assertEqual(hash(url1), hash(url2))  # 相同主机，哈希值应相同
 
+    def test_compare_completely_same_host(self):
+        # 测试除了路径会在后期添加其余完全相同主机的相等运算
+        url1 = ApiURL.from_url("https://example.com/translate")
+        url2 = ApiURL.from_url("https://example.com/v1/translate")
+        self.assertTrue(url1 == url2)
+        self.assertEqual(url1, url2)
+
     def test_parse_query(self):
         # 测试查询参数解析
         query = "param1=value1&param2=value2&param1=value3"
