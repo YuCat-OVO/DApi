@@ -1,6 +1,10 @@
 # Test files
 *url*.txt
 
+# result
+*result*.json
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
