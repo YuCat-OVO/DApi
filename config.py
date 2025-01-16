@@ -114,7 +114,7 @@ DEFAULT_API_BASE_PATH = ["v1"]
 SAVE_PROCESSED_DATA = True
 
 # 文件优先级列表，指定处理文件的优先级顺序
-FILE_PRIORITY = ["urls.txt"]
+FILE_PRIORITY = ["encrypted.txt", "raw_url_list.txt", "urls.txt"]
 
 # 是否将数据保存到文件，如果为 True，数据将被保存到文件中
 SAVE_DATA_TO_FILE = True
