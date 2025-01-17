@@ -194,7 +194,7 @@ def process_successful_response(
         )
     else:
         logging.error(
-            f"Invalid response content from {url}: {response_data[:15] if response else 'Data is empty'}."
+            f"Invalid response content from {url}: {response_data[:15] if response_data else 'Data is empty'}."
         )
         return ProcessedResponse(
             status=ReturnStatus.INVALID_CONTENT,
