@@ -45,6 +45,7 @@ class CategorizedResults:
     available_http_endpoints: dict[str, float] = field(default_factory=dict)
     rate_limited: dict[str, float] = field(default_factory=dict)
     cloudflare_blocked: dict[str, float] = field(default_factory=dict)
+    invalid_content: dict[str, float] = field(default_factory=dict)
     service_unavailable: dict[str, float] = field(default_factory=dict)
     unauthorized_urls: dict[str, float] = field(default_factory=dict)
     timeout_or_unreachable: list[str] = field(default_factory=list)
@@ -66,6 +67,8 @@ class CategorizedResults:
                 self.rate_limited[url] = response.latency
             case "CONTENT_IS_CLOUDFLARE":
                 self.cloudflare_blocked[url] = response.latency
+            case "INVALID_CONTENT":
+                self.invalid_content[url] = response.latency
             case "SERVER_ERROR_50X":
                 self.service_unavailable[url] = response.latency
             case "401":
@@ -267,10 +270,12 @@ def main():
         logging.error(f"Error during URL checking: {e}")
         return
 
+    # 排序
     if SORT_PROCESSED_DATA:
-        for field_name in fields(categorized_results):
+        for field_ in fields(categorized_results):
+            field_name = field_.name
             try:
-                categorized_results.sort(str(field_name))
+                categorized_results.sort(field_name)
             except ValueError as e:
                 logging.error(f"Failed to sort '{field_name}': {e}")
 

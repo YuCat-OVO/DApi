@@ -5,6 +5,46 @@ from main import CategorizedResults
 
 class TestCategorizedResults(unittest.TestCase):
     def setUp(self):
+        self.results = CategorizedResults()
+        self.results.available_https_endpoints = {
+            "https://example.com": 0.5,
+            "https://example.org": 0.3,
+            "https://example.net": -1,
+        }
+        self.results.available_http_endpoints = {
+            "http://example.com": 0.7,
+            "http://example.org": 0.4,
+        }
+        self.results.timeout_or_unreachable = [
+            "http://example.net",
+            "http://example.edu",
+        ]
+
+    def test_sort_available_https_endpoints(self):
+        self.results.sort("available_https_endpoints")
+        expected = {
+            "https://example.org": 0.3,
+            "https://example.com": 0.5,
+            "https://example.net": -1,
+        }
+        self.assertEqual(self.results.available_https_endpoints, expected)
+
+    def test_sort_timeout_or_unreachable(self):
+        self.results.sort("timeout_or_unreachable")
+        expected = ["http://example.edu", "http://example.net"]
+        self.assertEqual(self.results.timeout_or_unreachable, expected)
+
+    def test_sort_invalid_field(self):
+        with self.assertRaises(ValueError):
+            self.results.sort("invalid_field")
+
+    def test_sort_unsortable_field(self):
+        with self.assertRaises(ValueError):
+            self.results.sort("failed_urls")
+
+
+class TestCategorizedResults(unittest.TestCase):
+    def setUp(self):
         self.results = CategorizedResults(
             available_https_endpoints={
                 "https://example.com": 0.3,
