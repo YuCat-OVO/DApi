@@ -61,12 +61,13 @@ def load_urls_from_file(file_priority: Optional[list[str]] = None) -> list[ApiUR
             try:
                 with open(file_path, "r", encoding="utf-8") as file:
                     for line_number, line in enumerate(file, start=1):
-                        try:
-                            urls_list.append(ApiURL.from_url(line))
-                        except Exception as e:
-                            logging.warning(
-                                f"Failed to load URL at line {line_number}: {line.strip()}. Error: {e}"
-                            )
+                        if line.strip():
+                            try:
+                                urls_list.append(ApiURL.from_url(line))
+                            except Exception as e:
+                                logging.warning(
+                                    f"Failed to load URL at line {line_number}: {line.strip()}. Error: {e}"
+                                )
                 break
             except (PermissionError, IOError) as e:
                 logging.error(f"Failed to read file {file_path}: {e}")
