@@ -4,6 +4,8 @@ on:
   push:
     branches: [ master ]
   workflow_dispatch:
+  schedule:
+    - cron: '0 0 */3 * *'  # 每三天运行一次
 
 permissions:
   contents: write
@@ -44,32 +46,26 @@ jobs:
 
     - name: Create Release
       id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v1
       with:
         tag_name: v${{ env.now }}
         release_name: Release ${{ env.now }}
-        draft: false
-        prerelease: false
-
-    - name: Upload Result JSON
-      uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload Result JSON
+      uses: softprops/action-gh-release@v1
       with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        tag_name: v${{ env.now }}
         asset_path: ./categorized_results.json
-        asset_name: result.json
-        asset_content_type: application/json
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Upload Debug Log
       if: env.log_exists == 'true'
-      uses: actions/upload-release-asset@v1
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ env.now }}
+        asset_path: ./debug.log
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./debug.log
-        asset_name: debug.log
-        asset_content_type: text/plain
