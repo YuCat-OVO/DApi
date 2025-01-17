@@ -158,12 +158,12 @@ def process_urls_with_thread_pool(
             progress_bar.close()
 
 
-def display_results(categorized_results, show_list=False):
+def display_results(categorized_results, show_summary=True):
     """
     显示分类结果。
 
     :param categorized_results: 包含所有分类结果的对象。
-    :param show_list: 是否输出纯净的 URL 列表（无延迟和 Emoji）。
+    :param show_summary: 是否输出总结。
     """
 
     def print_urls(
@@ -228,7 +228,7 @@ def display_results(categorized_results, show_list=False):
     )  # ⏱️
     print_urls("Failed URLs", categorized_results.failed_urls, "\U0001F6AB")  # 🚫
 
-    if not show_list:
+    if show_summary:
         print("\n\U0001F4CA Summary of Results:")  # 📊
         for category, data in categorized_results.to_dict().items():
             if isinstance(data, dict):

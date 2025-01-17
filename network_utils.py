@@ -193,7 +193,9 @@ def process_successful_response(
             status=ReturnStatus.SUCCESS, data=response_data, latency=latency
         )
     else:
-        logging.error(f"Invalid response content from {url}: {response_data[15:]}")
+        logging.error(
+            f"Invalid response content from {url}: {response_data[:15] if response else 'Data is empty'}."
+        )
         return ProcessedResponse(
             status=ReturnStatus.INVALID_CONTENT,
             data=response_data,
