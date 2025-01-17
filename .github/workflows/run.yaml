@@ -31,7 +31,16 @@ jobs:
 
     - name: Get current timestamp
       id: timestamp
-      run: echo "::set-output name=now::$(date +'%Y%m%d%H%M%S')"
+      run: echo "now=$(date +'%Y%m%d%H%M%S')" >> $GITHUB_ENV
+
+    - name: Check if debug log exists
+      id: check_log
+      run: |
+        if [ -f "./debug.log" ]; then
+          echo "log_exists=true" >> $GITHUB_ENV
+        else
+          echo "log_exists=false" >> $GITHUB_ENV
+        fi
 
     - name: Create Release
       id: create_release
@@ -39,12 +48,12 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: v${{ steps.timestamp.outputs.now }}
-        release_name: Release ${{ steps.timestamp.outputs.now }}
+        tag_name: v${{ env.now }}
+        release_name: Release ${{ env.now }}
         draft: false
         prerelease: false
 
-    - name: Upload Release Asset
+    - name: Upload Result JSON
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -53,3 +62,14 @@ jobs:
         asset_path: ./categorized_results.json
         asset_name: result.json
         asset_content_type: application/json
+
+    - name: Upload Debug Log
+      if: env.log_exists == 'true'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./debug.log
+        asset_name: debug.log
+        asset_content_type: text/plain
