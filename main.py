@@ -199,30 +199,33 @@ def display_results(categorized_results, show_list=False):
 
     # 使用更符合场景的 Emoji
     print_urls(
-        "HTTPS Endpoints", categorized_results.available_https_endpoints, "\U0001F511"
-    )  # 🔑
+        "HTTPS Endpoints", categorized_results.available_https_endpoints, "\U0001F512"
+    )  # 🔒
     print_urls(
         "HTTP Endpoints", categorized_results.available_http_endpoints, "\U0001F310"
     )  # 🌐
     print_urls(
-        "Rate Limited URLs", categorized_results.rate_limited, "\U0001F6A7"
-    )  # 🚧
+        "Rate Limited URLs", categorized_results.rate_limited, "\U000023F3"
+    )  # ⏳
+    print_urls(
+        "Invalid Content URLs", categorized_results.invalid_content, "\U0000274C"
+    )  # ❌
     print_urls(
         "Cloudflare Blocked URLs", categorized_results.cloudflare_blocked, "\U0001F6E1"
     )  # 🛡️
     print_urls(
         "Service Unavailable URLs",
         categorized_results.service_unavailable,
-        "\U0001F6A8",
-    )  # 🚨
+        "\U000026A0",
+    )  # ⚠️
     print_urls(
         "Unauthorized URLs", categorized_results.unauthorized_urls, "\U0001F510"
     )  # 🔐
     print_urls(
         "Timeout or Unreachable URLs",
         categorized_results.timeout_or_unreachable,
-        "\U0001F504",
-    )  # 🔄
+        "\U000023F1",
+    )  # ⏱️
     print_urls("Failed URLs", categorized_results.failed_urls, "\U0001F6AB")  # 🚫
 
     if not show_list:
