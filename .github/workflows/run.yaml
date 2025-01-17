@@ -46,26 +46,26 @@ jobs:
 
     - name: Create Release
       id: create_release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: v${{ env.now }}
-        release_name: Release ${{ env.now }}
+        name: Release ${{ env.now }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Upload Result JSON
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: v${{ env.now }}
-        asset_path: ./categorized_results.json
+        files: ./categorized_results.json
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Upload Debug Log
       if: env.log_exists == 'true'
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: v${{ env.now }}
-        asset_path: ./debug.log
+        files: ./debug.log
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
